@@ -16,7 +16,7 @@ npm install --save-dev electron@latest
 
 ## Version 1.x
 
-Electron versions *< 2.0* did not conform to the [semver](http://semver.org) spec: major versions corresponded to end-user API changes, minor versions corresponded to Chromium major releases, and patch versions corresponded to new features and bug fixes. While convenient for developers merging features, it creates problems for developers of client-facing applications. The QA testing cycles of major apps like Slack, Stride, Teams, Skype, VS Code, Atom, and Desktop can be lengthy and stability is a highly desired outcome. There is a high risk in adopting new features while trying to absorb bug fixes.
+Electron versions *< 2.0* did not conform to the [semver](https://semver.org) spec: major versions corresponded to end-user API changes, minor versions corresponded to Chromium major releases, and patch versions corresponded to new features and bug fixes. While convenient for developers merging features, it creates problems for developers of client-facing applications. The QA testing cycles of major apps like Slack, Stride, Teams, Skype, VS Code, Atom, and Desktop can be lengthy and stability is a highly desired outcome. There is a high risk in adopting new features while trying to absorb bug fixes.
 
 Here is an example of the 1.x strategy:
 
@@ -48,7 +48,6 @@ Below is a table explicitly mapping types of changes to their corresponding cate
 | Node.js major version updates   | Node.js minor version updates      | Node.js patch version updates |
 | Chromium version updates        |                                    | fix-related chromium patches  |
 
-
 Note that most Chromium updates will be considered breaking. Fixes that can be backported will likely be cherry-picked as patches.
 
 # Stabilization Branches
@@ -57,7 +56,7 @@ Stabilization branches are branches that run parallel to master, taking in only 
 
 ![](../images/versioning-sketch-1.png)
 
-Stabilization branches are always either **major** or **minor** version lines, and named against the following template `$MAJOR-$MINOR-x` e.g. `2-0-x`.
+Since Electron 8, stabilization branches are always **major** version lines, and named against the following template `$MAJOR-x-y` e.g. `8-x-y`.  Prior to that we used **minor** version lines and named them as `$MAJOR-$MINOR-x` e.g. `2-0-x`
 
 We allow for multiple stabilization branches to exist simultaneously, and intend to support at least two in parallel at all times, backporting security fixes as necessary.
 ![](../images/versioning-sketch-2.png)
@@ -77,18 +76,23 @@ Whatever you choose, you will periodically have to bump the version in your `pac
 
 The process is as follows:
 
-1. All new major and minor releases lines begin with a `-beta.N` tag for `N >= 1`. At that point, the feature set is **locked**. That release line admits no further features, and focuses only on security and stability.
-e.g. `2.0.0-beta.1`.
-2. Bug fixes, regression fixes, and security patches can be admitted. Upon doing so, a new beta is released incrementing `N`.
-e.g. `2.0.0-beta.2`
-3. If a particular beta release is _generally regarded_ as stable, it will be re-released as a stable build, changing only the version information.
-e.g. `2.0.0`.
-4. If future bug fixes or security patches need to be made once a release is stable, they are applied and the _patch_ version is incremented accordingly
+1. All new major and minor releases lines begin with a beta series indicated by semver prerelease tags of `beta.N`, e.g. `2.0.0-beta.1`. After the first beta, subsequent beta releases must meet all of the following conditions:
+    1. The change is backwards API-compatible (deprecations are allowed)
+    2. The risk to meeting our stability timeline must be low.
+2. If allowed changes need to be made once a release is beta, they are applied and the prerelease tag is incremented, e.g. `2.0.0-beta.2`.
+3. If a particular beta release is _generally regarded_ as stable, it will be re-released as a stable build, changing only the version information. e.g. `2.0.0`. After the first stable, all changes must be backwards-compatible bug or security fixes.
+4. If future bug fixes or security patches need to be made once a release is stable, they are applied and the _patch_ version is incremented
 e.g. `2.0.1`.
+
+Specifically, the above means:
+
+1. Admitting non-breaking-API changes before Week 3 in the beta cycle is okay, even if those changes have the potential to cause moderate side-effects
+2. Admitting feature-flagged changes, that do not otherwise alter existing code paths, at most points in the beta cycle is okay. Users can explicitly enable those flags in their apps.
+3. Admitting features of any sort after Week 3 in the beta cycle is 👎 without a very good reason.
 
 For each major and minor bump, you should expect to see something like the following:
 
-```text
+```plaintext
 2.0.0-beta.1
 2.0.0-beta.2
 2.0.0-beta.3
@@ -112,25 +116,21 @@ A few examples of how various semver ranges will pick up new releases:
 
 ![](../images/versioning-sketch-7.png)
 
-# Missing Features: Alphas, and Nightly
+# Missing Features: Alphas
+
 Our strategy has a few tradeoffs, which for now we feel are appropriate. Most importantly that new features in master may take a while before reaching a stable release line. If you want to try a new feature immediately, you will have to build Electron yourself.
 
 As a future consideration, we may introduce one or both of the following:
 
-* nightly builds off of master; these would allow folks to test new features quickly and give feedback
 * alpha releases that have looser stability constraints to betas; for example it would be allowable to admit new features while a stability channel is in _alpha_
 
 # Feature Flags
+
 Feature flags are a common practice in Chromium, and are well-established in the web-development ecosystem. In the context of Electron, a feature flag or **soft branch** must have the following properties:
 
 * it is enabled/disabled either at runtime, or build-time; we do not support the concept of a request-scoped feature flag
 * it completely segments new and old code paths; refactoring old code to support a new feature _violates_ the feature-flag contract
-* feature flags are eventually removed after the soft-branch is merged
-
-We reconcile flagged code with our versioning strategy as follows:
-
-1. we do not consider iterating on feature-flagged code in a stability branch; even judicious use of feature flags is not without risk
-2. you may break API contracts in feature-flagged code without bumping the major version. Flagged code does not adhere to semver
+* feature flags are eventually removed after the feature is released
 
 # Semantic Commits
 
@@ -140,11 +140,12 @@ We seek to increase clarity at all levels of the update and releases process. St
 * Commits that would result in a semver **minor** bump must start with `feat:`.
 * Commits that would result in a semver **patch** bump must start with `fix:`.
 
-* We allow squashing of commits, provided that the squashed message adheres the the above message format.
+* We allow squashing of commits, provided that the squashed message adheres to the above message format.
 * It is acceptable for some commits in a pull request to not include a semantic prefix, as long as the pull request title contains a meaningful encompassing semantic message.
 
-# Versionless `master`
+# Versioned `master`
 
-- The `master` branch will always contain `0.0.0-dev` in its `package.json`
-- Release branches are never merged back to master
-- Release branches _do_ contain the correct version in their `package.json`
+* The `master` branch will always contain the next major version `X.0.0-nightly.DATE` in its `package.json`
+* Release branches are never merged back to master
+* Release branches _do_ contain the correct version in their `package.json`
+* As soon as a release branch is cut for a major, master must be bumped to the next major.  I.e. `master` is always versioned as the next theoretical release branch
